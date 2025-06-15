@@ -1,0 +1,24 @@
+i2c_bus: 3
+i2c_addr: 0x3C
+net_interface: eth0
+disk_path: /
+update_interval: 5
+
+temp:
+  chip_name: "cpu_thermal-virtual-0"       # temp source (lm-sensors output): "cpu_thermal-virtual-0"
+  feature_label: "temp1"              # label to get data (lm-sensors output): "temp1"
+
+  min_temp: 30
+  max_temp: 90
+  min_bar_height: 1
+  max_bar_height: 6
+  bar_width: 2
+  bar_spacing: 1
+
+  font_size: 10
+  font_path: "DejaVuSans.ttf"
+
+  graph_x: 60
+  graph_y_offset: 4
+  graph_height: 6
+  graph_width: 50
