@@ -36,14 +36,14 @@ Or run the PyInstaller pre-compiled binary:
 
 ## Configuratioin:
 Create a config.yaml file with screen and commands sections.
-You can specify global_refresh_timeout for update all strings, or specify refresh_time for every string if needed.
+You can specify global_refresh_time for update all strings, or specify refresh_time for every string if needed.
 ```yaml
 screen:
   width: 128            # OLED display width in pixels
   height: 64            # OLED display height in pixels
   font_size: 10         # Font size in points
   font: DejaVuSans.ttf  # Font file name or path to TrueType font
-  refresh_time: 1       # Time interval (seconds) to refresh and update all command outputs on screen
+  global_refresh_time: 1       # Time interval (seconds) to refresh and update all command outputs on screen
   scroll_speed: 1       # Delay (seconds) between each scroll step for lines wider than screen
   scroll_step: 20       # Number of pixels to shift text per scroll step
   i2c_bus: 4            # I2C bus number used for the OLED display
@@ -54,7 +54,7 @@ commands:
     command: "hostname -I | cut -d' ' -f1"
   - text: "Load: "
     command: "uptime | awk -F'load average:' '{print $2}'"
-    refresh_time: 1
+    refresh_time: 1 # Set specific refresh time for string
   - text: "Static Info"
 ```
 
