@@ -36,6 +36,7 @@ Or run the PyInstaller pre-compiled binary:
 
 ## Configuratioin:
 Create a config.yaml file with screen and commands sections.
+You can specify global_refresh_timeout for update all strings, or specify refresh_time for every string if needed.
 ```yaml
 screen:
   width: 128            # OLED display width in pixels
@@ -53,6 +54,7 @@ commands:
     command: "hostname -I | cut -d' ' -f1"
   - text: "Load: "
     command: "uptime | awk -F'load average:' '{print $2}'"
+    refresh_time: 1
   - text: "Static Info"
 ```
 
