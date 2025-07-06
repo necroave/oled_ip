@@ -1,41 +1,23 @@
-# OLED IP & System Monitor
+# OLED Info Display
 
-A Python script to display system information on an SSD1306 OLED display via I2C.  
-Shows IP address, CPU load, disk usage, CPU temperature with a simple historical temperature graph.
-
----
+A configurable Python script for displaying system or custom command output on an SSD1306 OLED screen over I²C.
 
 ## Features
 
-- Displays IP address of a specified network interface  
-- Shows current CPU usage (%)  
-- Displays disk usage (used and free space in GB)  
-- Reads CPU temperature using `lm-sensors` (configurable sensor name and label)  
-- Draws a historical temperature bar graph  
-- Supports configuration via external `config.yaml` file  
-- Loads font and config from the same directory (works with PyInstaller-built binaries)  
-- Auto updates every configurable number of seconds  
-
+- Output any shell command or static text to OLED
+- Scrolls long lines horizontally
+- Auto-refreshes output at configurable intervals
+- External `config.yaml` for display and command settings
+- Supports custom TrueType fonts (TTF)
+- Optional debug logging to console
+- Contains own SSD1306 driver
 ---
 
 ## Requirements
 
-- Python 3  
-- [psutil](https://pypi.org/project/psutil/)  
-- [PyYAML](https://pypi.org/project/PyYAML/)  
-- [smbus2](https://pypi.org/project/smbus2/)  
-- [Pillow](https://pypi.org/project/Pillow/)  
-- `lm-sensors` installed and configured on the system  
+- [Pillow](https://pypi.org/project/Pillow/) >=9.0.0
+- [PyYAML](https://pypi.org/project/PyYAML/)  >=6.0
 - SSD1306 OLED display connected via I2C  
-
----
-
-## Installation
-
-```bash
-pip install psutil PyYAML smbus2 Pillow
-sudo apt install lm-sensors
-```
 
 ---
 ## Usage
@@ -44,44 +26,45 @@ sudo apt install lm-sensors
 - Run the script directly:
 
 ```bash
-python oled_ip.py
+python3 oled_ip.py [--config ./config.yaml] [--font ./DejaVuSans.ttf] [--debug]
 ```
-Or run the PyInstaller-compiled binary:
+Or run the PyInstaller pre-compiled binary:
 ```bash
 ./oled_ip
 ```
 ---
 
-## Example config.yaml
+## Configuratioin:
+Create a config.yaml file with screen and commands sections.
 ```yaml
-net_interface: eth0
-disk_path: /
-i2c_bus: 1
-i2c_addr: 0x3C
-update_interval: 5
+screen:
+  width: 128            # OLED display width in pixels
+  height: 64            # OLED display height in pixels
+  font_size: 10         # Font size in points
+  font: DejaVuSans.ttf  # Font file name or path to TrueType font
+  refresh_time: 1       # Time interval (seconds) to refresh and update all command outputs on screen
+  scroll_speed: 1       # Delay (seconds) between each scroll step for lines wider than screen
+  scroll_step: 20       # Number of pixels to shift text per scroll step
+  i2c_bus: 4            # I2C bus number used for the OLED display
+  i2c_address: 0x3c     # I2C address of the OLED display
 
-temp:
-  chip_name: cpu_thermal-virtual-0
-  feature_label: temp1
-  min_temp: 30
-  max_temp: 100
-  min_bar_height: 1
-  max_bar_height: 6
-  bar_width: 2
-  bar_spacing: 1
-  font_size: 10
-  font_path: DejaVuSans.ttf
-  graph_x: 60
-  graph_y_offset: 4
-  graph_height: 6
-  graph_width: 50
-
+commands:
+  - text: "IP: "
+    command: "hostname -I | cut -d' ' -f1"
+  - text: "Load: "
+    command: "uptime | awk -F'load average:' '{print $2}'"
+  - text: "Static Info"
 ```
+
 ---
 
-## Notes
-- Adjust chip_name and feature_label according to the output of sensors command to match your hardware sensors correctly.
-- The temperature graph displays a historical temperature trend with bar heights scaled between min_temp and max_temp.
-- Ensure the I2C bus number and address correspond to your OLED hardware configuration.
-- The script supports both running as a normal Python script and as a PyInstaller-built executable, automatically locating config and font relative to the executable location.
-- You can customize update intervals and graphical parameters via the config file for your needs.
+## Building binary (optional)
+To create a single executable using PyInstaller:
+```bash
+pip install pyinstaller
+pyinstaller --onefile oled_ip.py
+```
+Then run:
+```bash
+./dist/oled_ip --config ./config.yaml --font ./DejaVuSans.ttf
+```
