@@ -3,7 +3,7 @@ screen:
   height: 64            # OLED display height in pixels
   font_size: 10         # Font size in points
   font: DejaVuSans.ttf  # Font file name or path to TrueType font
-  refresh_time: 1       # Time interval (seconds) to refresh and update all command outputs on screen
+  global_refresh_time: 10       # Global refresh timeout
   scroll_speed: 1       # Delay (seconds) between each scroll step for lines wider than screen
   scroll_step: 20       # Number of pixels to shift text per scroll step
   i2c_bus: 4            # I2C bus number used for the OLED display
@@ -22,3 +22,4 @@ commands:
     command: "uptime | awk -F'load average:' '{print $2}'"       # Get load averages from uptime
   - text: "Time: "      # Label prefix for current local time
     command: "timedatectl | grep 'Local time: ' | awk '{print $5}'"  # Extract current time from timedatectl
+    refresh_time: 1 # refresh timeout for specific string

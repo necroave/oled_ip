@@ -5,21 +5,21 @@ import argparse
 import sys
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
-from ssd1306_driver import SSD1306
+from ssd1306_driver import SSD1306  # должен лежать рядом
 
 parser = argparse.ArgumentParser(description="OLED display script")
 parser.add_argument("--debug", action="store_true", help="Enable console logging of displayed lines")
-parser.add_argument("--config", type=str, default=None, help="Path to config.yaml file")
-parser.add_argument("--font", type=str, default=None, help="Path to TTF font file")
+parser.add_argument("--config", type=str, help="Path to config.yaml")
+parser.add_argument("--font", type=str, help="Path to TTF font")
 args = parser.parse_args()
 
-# Determine base directory — next to binary or next to script
+# detect base_dir
 if getattr(sys, "frozen", False):
     base_dir = Path(sys.executable).parent
 else:
     base_dir = Path(__file__).parent.resolve()
 
-# Path to config file
+# path to config.yaml
 config_path = Path(args.config) if args.config else base_dir / "config.yaml"
 if not config_path.is_file():
     print(f"Config file not found: {config_path}")
@@ -31,7 +31,7 @@ with open(config_path, "r") as f:
 screen_conf = config["screen"]
 commands = config["commands"]
 
-# Path to font file
+# path to font
 if args.font:
     font_path = Path(args.font)
 else:
@@ -43,7 +43,7 @@ if not font_path.is_file():
     print(f"Font file not found: {font_path}")
     sys.exit(1)
 
-# Initialize OLED display with given width, height, i2c bus and address
+# init screen
 oled = SSD1306(
     width=screen_conf["width"],
     height=screen_conf["height"],
@@ -51,42 +51,64 @@ oled = SSD1306(
     address=screen_conf.get("i2c_address", 0x3C),
 )
 
-# Load TrueType font with configured size
+# load font
 font = ImageFont.truetype(str(font_path), screen_conf["font_size"])
 font_height = screen_conf["font_size"]
 
-# Refresh interval (seconds) to update all commands and displayed data
-refresh_time = screen_conf.get("refresh_time", 10)
-# Scroll delay (seconds) between each scroll step for long lines
+# screen parameters
+global_refresh_time = screen_conf.get("global_refresh_time", 10)
 scroll_speed = screen_conf.get("scroll_speed", 0.1)
-# Pixels to shift text per scroll step
 scroll_step = 1
 
 def run_command(cmd: str) -> str:
-    """Execute shell command and return trimmed output or 'error'."""
     try:
         return subprocess.check_output(cmd, shell=True, text=True).strip()
     except subprocess.CalledProcessError:
         return "error"
 
 def text_width(text, font):
-    """Calculate pixel width of text with given font."""
     bbox = font.getbbox(text)
     return bbox[2] - bbox[0]
 
-max_lines = oled.height // font_height  # Maximum number of text lines on screen
+max_lines = oled.height // font_height
 
+# prepare strings
+line_states = []
+now = time.time()
+
+for item in commands:
+    text = item.get("text", "")
+    cmd = item.get("command")
+    rt = item.get("refresh_time", global_refresh_time)
+
+    if cmd:
+        value = run_command(cmd)
+    else:
+        value = ""
+
+    line_states.append({
+        "text": text,
+        "command": cmd,
+        "value": value,
+        "refresh_time": rt,
+        "last_update": now,
+    })
+
+# main cycle
 while True:
-    lines = []
-    # Run each command and prepend static text if any
-    for item in commands:
-        text = item.get("text", "")
-        cmd = item.get("command")
-        if cmd:
-            result = run_command(cmd)
-            lines.append(f"{text}{result}")
-        else:
-            lines.append(text)
+    now = time.time()
+
+    # refresh every string with timeout
+    for state in line_states:
+        if state["command"] and (now - state["last_update"] >= state["refresh_time"]):
+            state["value"] = run_command(state["command"])
+            state["last_update"] = now
+
+    # prepare data for strings
+    lines = [
+        f"{s['text']}{s['value']}" if s["command"] else s["text"]
+        for s in line_states
+    ]
 
     if args.debug:
         print("=== OLED DISPLAY ===")
@@ -94,42 +116,50 @@ while True:
             print(line)
         print("====================")
 
-    # Initialize scroll positions and max scroll offsets per line
+    # scroll: determine string lenght
     scroll_pos = [0] * len(lines)
     scroll_max_offsets = []
     for line in lines:
         w = text_width(line, font)
         if w > oled.width:
-            scroll_max_offsets.append(w - oled.width + 10)  # Extra gap for smooth scroll
+            scroll_max_offsets.append(w - oled.width + 10)
         else:
             scroll_max_offsets.append(0)
 
-    start_time = time.time()
-    # Loop for duration of refresh_time to scroll lines and update display
-    while time.time() - start_time < refresh_time:
-        image = Image.new("1", (oled.width, oled.height))  # Create blank monochrome image
+    # scrolling
+    while True:
+        now = time.time()
+        needs_refresh = False
+        for s in line_states:
+            if s["command"] and (now - s["last_update"] >= s["refresh_time"]):
+                needs_refresh = True
+                break
+        if needs_refresh:
+            break
+
+        # draw
+        image = Image.new("1", (oled.width, oled.height))
         draw = ImageDraw.Draw(image)
 
         y = 0
-        # Draw each line, scrolling if too wide
         for i, line in enumerate(lines[:max_lines]):
             w = text_width(line, font)
             if w > oled.width:
                 offset = -scroll_pos[i]
                 draw.text((offset, y), line, font=font, fill=255)
-                draw.text((offset + w + 10, y), line, font=font, fill=255)  # Repeat for seamless scroll
+                draw.text((offset + w + 10, y), line, font=font, fill=255)
             else:
                 draw.text((0, y), line, font=font, fill=255)
             y += font_height
 
-        oled.image(image)  # Send image buffer to OLED
-        oled.display()     # Update OLED screen
+        oled.image(image)
+        oled.display()
 
-        time.sleep(scroll_speed)  # Wait between scroll steps
+        time.sleep(scroll_speed)
 
-        # Update scroll positions for lines that need scrolling
+        # refresh scroll position
         for i in range(len(lines)):
             if scroll_max_offsets[i] > 0:
                 scroll_pos[i] += scroll_step
                 if scroll_pos[i] > scroll_max_offsets[i]:
-                    scroll_pos[i] = 0  # Reset scroll to start when max reached
+                    scroll_pos[i] = 0
